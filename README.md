@@ -1,4 +1,5 @@
 # europe-gis
 Processing GIS data for Europe
 
-'pip freeze > requirements.txt'
+# saving virtual environment
+- `pip freeze > requirements.txt` - save list of packages to file
