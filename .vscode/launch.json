@@ -1,0 +1,29 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "MLaaS",
+      "program": "${workspaceFolder}\\server.js",
+      "env": {
+        "NODE_ENV": "dev"
+      }
+    },
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "MLaaS_python",
+      "program": "${workspaceFolder}\\mlaas_run.py"
+    },
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "MLaaS_python_test",
+      "program": "${workspaceFolder}\\test.py"
+    }
+  ]
+}
