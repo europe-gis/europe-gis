@@ -1,4 +1,5 @@
 import os
+import time
 import struct
 import collections
 import numpy as np
@@ -45,17 +46,19 @@ if band.GetOverviewCount() > 0:
 if band.GetRasterColorTable():
     print("Band has a color table with {} entries".format(band.GetRasterColorTable().GetCount()))
 
-scanline = band.ReadRaster(
-    xoff=0,
-    yoff=0,
-    xsize=band.XSize,
-    ysize=1,
-    buf_xsize=band.XSize,
-    buf_ysize=1,
-    buf_type=gdal.GDT_Float32
-)
+# scanline = band.ReadRaster(
+#     xoff=0,
+#     yoff=0,
+#     xsize=band.XSize,
+#     ysize=1,
+#     buf_xsize=band.XSize,
+#     buf_ysize=1,
+#     buf_type=gdal.GDT_Float32
+# )
 
-n = 10
+n = 10000
+
+t = time.time()
 
 scanline = band.ReadRaster(
     xoff=band.XSize / 2,
@@ -67,22 +70,25 @@ scanline = band.ReadRaster(
     buf_type=gdal.GDT_Float32
 )
 
+print(time.time() - t)
+
 square_tuple_of_floats = struct.unpack('f' * n * n, scanline)
+
+print(time.time() - t)
+
 sresults = np.array(list(square_tuple_of_floats)).reshape(n, n)
-
-
-scanline = band.ReadRaster(
-    xoff=band.XSize / 2,
-    yoff=band.YSize / 2,
-    xsize=n,
-    ysize=1,
-    buf_xsize=n,
-    buf_ysize=1,
-    buf_type=gdal.GDT_Float32
-)
-tuple_of_floats = struct.unpack('f' * 1 * n, scanline)
+# scanline = band.ReadRaster(
+#     xoff=band.XSize / 2,
+#     yoff=band.YSize / 2,
+#     xsize=n,
+#     ysize=1,
+#     buf_xsize=n,
+#     buf_ysize=1,
+#     buf_type=gdal.GDT_Float32
+# )
+# tuple_of_floats = struct.unpack('f' * 1 * n, scanline)
 
 # tuple_of_floats = struct.unpack('f' * band.XSize, scanline)
-counter = collections.Counter(list(tuple_of_floats))
+counter = collections.Counter(list(square_tuple_of_floats))
 
 print(counter)

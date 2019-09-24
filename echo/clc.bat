@@ -1,0 +1,1 @@
+raster2pgsql -d -R -I -C -e -Y -F -s 3035 -t 1000x1000 D:\RESEARCH\SATELLITE\CLC\2018\clc2018_clc2018_v2018_20_raster100m\*.tif clc | psql -U postgres -d postgis_25_sample
