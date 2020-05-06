@@ -5,7 +5,7 @@
       "type": "python",
       "request": "launch",
       "name": "creating image files",
-      "program": "${workspaceFolder}\\create_image_files.py",
+      "program": "${workspaceFolder}/create_image_files.py",
       "env": {
         "NODE_ENV": "dev"
       }

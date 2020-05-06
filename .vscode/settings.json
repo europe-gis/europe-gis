@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "C:\\Users\\Tamás\\Documents\\VirtualEnvironments\\eugis\\Scripts\\python.exe",
+    "python.pythonPath": "/home/tilyes/VirtualEnvironments/eugis/bin/python",
     "python.linting.pylintEnabled": false,
     "python.linting.enabled": true,
     "python.linting.flake8Enabled": true,
