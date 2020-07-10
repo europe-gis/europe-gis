@@ -172,14 +172,14 @@ RUN apt-get update; \
 RUN apt-get update -y; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y  --no-install-recommends \
         python3-numpy libpython3.8 \
-        libjpeg-turbo8 libgeos-3.8.0 libgeos-c1v5 \
+        libjpeg-turbo8 libgeos-3.6.2 libgeos-c1v5 \
         libexpat1 \
         libxerces-c3.2 \
         libwebp6 \
         libzstd1 bash libpq5 libssl1.1 libopenjp2-7
 
-RUN apt-get update; \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y python-is-python3
+RUN ln -s /usr/bin/python3 /usr/bin/python & \
+    ln -s /usr/bin/pip3 /usr/bin/pip
 
 # Order layers starting with less frequently varying ones
 # Only used for custom libopenjp2
@@ -200,10 +200,12 @@ COPY --from=builder  /build_gdal_version_changing/usr/ /usr/
 
 RUN ldconfig
 RUN apt-get install -y \
-    python-numpy \
     g++ \
-    python3-pip \
-    git
+    git \
+    libproj-dev \
+    libspatialindex-dev \
+    python-numpy \
+    python3-pip
 
 RUN pip3 install cython
 
@@ -211,24 +213,21 @@ RUN pip3 install \
     numpy
 
 RUN pip3 install \
+    fiona \
+    notebook \
     pandas \
     pymongo \
-    notebook
+    rasterio \
+    rtree \
+    shapely
 
-ENV PROJ_DIR /usr
-
-RUN pip3 install git+https://github.com/pyproj4/pyproj.git
-
-RUN pip3 install fiona shapely rtree
-
-RUN pip3 install git+git://github.com/geopandas/geopandas.git
+ENV PROJ_DIR /usr/local
 
 RUN pip3 install \
-    rasterio
+    git+https://github.com/pyproj4/pyproj.git
 
-# RUN apt-get install libproj-dev proj-data proj-bin  
-# RUN apt-get install libgeos-dev  
-# RUN pip install cython  
+RUN pip3 install \
+    git+git://github.com/geopandas/geopandas.git
 
 WORKDIR /app
 

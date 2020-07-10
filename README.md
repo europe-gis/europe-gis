@@ -5,5 +5,5 @@ Processing GIS data for Europe
 - `pip freeze > requirements.txt` - save list of packages to file
 
 ```
-docker build . -t eugis
+docker build . -t eugis/eugis:latest
 ```
