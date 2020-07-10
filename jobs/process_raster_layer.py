@@ -4,8 +4,8 @@ import rasterio
 import rasterio.plot
 from rasterio import features
 from rasterio.windows import Window, from_bounds
-from matplotlib import pyplot
 from rasterio.enums import MergeAlg
+from matplotlib import pyplot
 from osgeo import gdal
 
 path = '/mnt/z/RESEARCH/SATELLITE/DEM/'
@@ -18,8 +18,6 @@ class ProcessRasterLayer(object):
             for file in f:
                 if file[-4:] == '.TIF':
                     files.append(os.path.join(r, file))
-
-
 
 
 def CreateTIFFromVRT(vrt_fn, tif_fn):
@@ -69,13 +67,13 @@ def CreateBorderRaster(shp_fn, rst_fn, out_fn):
     meta = rst.meta.copy()
     meta.update(compress='lzw')
 
-    counties.to_crs(meta ["crs"])
+    counties.to_crs(meta["crs"])
 
     with rasterio.open(out_fn, 'w+', **meta) as out_rst:
 
         out_rst_data = out_rst.read(1)
-        shapes = ((geom,value) for geom, value in zip(counties.geometry, counties.C) if features.is_valid_geom(geom))
-        
+        shapes = ((geom, value) for geom, value in zip(counties.geometry, counties.C) if features.is_valid_geom(geom))
+
         burned = features.rasterize(
             shapes=shapes,
             fill=0,
@@ -86,8 +84,8 @@ def CreateBorderRaster(shp_fn, rst_fn, out_fn):
         )
         out_rst.write_band(1, burned)
 
-        shapes = ((geom,value) for geom, value in zip(counties.geometry, counties.C) if features.is_valid_geom(geom))
-        
+        shapes = ((geom, value) for geom, value in zip(counties.geometry, counties.C) if features.is_valid_geom(geom))
+
         burned = features.rasterize(
             shapes=shapes,
             fill=0,
@@ -118,6 +116,7 @@ def ReadWindowFromOffset(src_fn, coordinates):
         )
     return w
 
+
 def ReadWindowFromCoordinates(src_fn, coordinates):
     left, bottom, right, top = coordinates
     with rasterio.open(src_fn) as src:
@@ -133,3 +132,9 @@ def ReadWindowFromCoordinates(src_fn, coordinates):
             window=window
         )
     return w
+
+
+def plotArray(array):
+    pyplot.imshow(array, cmap='pink')
+    pyplot.show()
+    return
