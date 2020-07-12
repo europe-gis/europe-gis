@@ -6,4 +6,6 @@ Processing GIS data for Europe
 
 ```
 docker build . -t eugis/eugis:latest
+docker push eugis/eugis:latest
+
 ```

@@ -214,6 +214,7 @@ RUN pip3 install \
 
 RUN pip3 install \
     fiona \
+    h5py \
     notebook \
     pandas \
     pymongo \
@@ -232,3 +233,5 @@ RUN pip3 install \
 WORKDIR /app
 
 COPY . /app
+
+CMD jupyter notebook --ip 0.0.0.0 --no-browser --allow-root
