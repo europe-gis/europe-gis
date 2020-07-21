@@ -97,6 +97,8 @@ RUN mkdir proj \
     && strip -s /build${PROJ_INSTALL_PREFIX}/lib/libinternalproj.so.${PROJ_SO} \
     && for i in /build${PROJ_INSTALL_PREFIX}/bin/*; do strip -s $i 2>/dev/null || /bin/true; done
 
+RUN apt-get install -y libpng-dev
+
 # Build GDAL
 ARG GDAL_VERSION=master
 ARG GDAL_RELEASE_DATE
@@ -204,6 +206,7 @@ RUN apt-get install -y \
     git \
     libproj-dev \
     libspatialindex-dev \
+    python3-h5py \
     python-numpy \
     python3-pip
 
