@@ -236,5 +236,5 @@ RUN pip3 install \
 WORKDIR /app
 
 COPY . /app
-
+EXPOSE 8888
 CMD jupyter notebook --ip 0.0.0.0 --no-browser --allow-root
