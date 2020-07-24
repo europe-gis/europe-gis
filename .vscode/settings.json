@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "/home/pi/Development/virtualenv/eugis/bin/python",
+    "python.pythonPath": "../virtualenv/eugis/bin/python",
     "python.linting.pylintEnabled": false,
     "python.linting.enabled": true,
     "python.linting.flake8Enabled": true,
