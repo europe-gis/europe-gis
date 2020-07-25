@@ -4,11 +4,8 @@
     {
       "type": "python",
       "request": "launch",
-      "name": "creating image files",
-      "program": "${workspaceFolder}/create_image_files.py",
-      "env": {
-        "NODE_ENV": "dev"
-      }
+      "name": "test eugis python",
+      "program": "${workspaceFolder}/main.py"
     }
   ]
 }
