@@ -1,6 +1,10 @@
 {
-    "WINDOW" :  {
-        "DEM" : 1000
+    "DEM" : {
+        "RESOLUTION": 25
+    },
+    "AGGREGATION" :  {
+        "DEM" : 40,
+        "TARGET_SQ_RESOLUTION" : 100
 
     }
 }
