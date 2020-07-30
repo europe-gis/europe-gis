@@ -1,5 +1,8 @@
 import os
 import json
+import shutil
+import pathlib
+import pandas as pd
 import geopandas as gpd
 import rasterio
 import rasterio.plot
@@ -29,8 +32,8 @@ class ProcessRasterLayer(object):
         return w
 
     @staticmethod
-    def plotArray(array):
-        pyplot.imshow(array, cmap='pink')
+    def plotArray(array, cmap='viridis'):
+        pyplot.imshow(array, cmap=cmap)
         pyplot.show()
         return
 
@@ -63,13 +66,15 @@ class ProcessRasterLayer(object):
             )
         return w
 
-    def __init__(self, root_dem_path, root_nuts_path, root_work_path):
+    def __init__(self, root_dem_path, root_nuts_path, root_work_path, restart = False):
         self.root_dem_path = root_dem_path
         self.root_nuts_path = root_nuts_path
         self.root_work_path = root_work_path
 
-        os.rmdir(root_work_path)
-        os.makedirs(root_work_path)
+        if restart:
+            shutil.rmtree(root_work_path, ignore_errors=True)
+            # if not os.path.exists(root_work_path):
+            os.makedirs(root_work_path)
 
         self.dem_source_fns = []
         for r, d, f in os.walk(root_dem_path):
@@ -77,7 +82,7 @@ class ProcessRasterLayer(object):
                 if file[-4:] == '.TIF':
                     self.dem_source_fns.append(os.path.join(r, file))
 
-        with open('./config/config.json') as json_file:
+        with open(str(pathlib.Path().absolute()).replace('/notebooks', '') + '/config/config.json') as json_file:
             self.config = json.load(json_file)
 
     def LoadRasterStatistics(self, input_fn, name):
@@ -115,7 +120,7 @@ class ProcessRasterLayer(object):
         return
 
     def CreateFullVRT(self):
-        self.CreateVRT('dem_full', xy_resolution=1)
+        self.CreateVRT('dem_full', xy_resolution=self.config['AGGREGATION']['DEM'])
         self.LoadRasterStatistics(self.dem_full_vrt_fn, 'dem_full')
         return
 
@@ -156,7 +161,7 @@ class ProcessRasterLayer(object):
         if not hasattr(self, 'nuts_borders'):
             self.LoadShapefile()
 
-        out_fn = self.root_dem_path + 'nuts_rst.tif'
+        out_fn = self.root_work_path + 'nuts_rst.tif'
         with rasterio.open(out_fn, 'w+', **self.raster_metadata) as out_rst:
 
             out_rst_data = out_rst.read(1)
@@ -214,7 +219,7 @@ class ProcessRasterLayer(object):
             self.loaded_files['dem_full']['bounds'],
             self.GetTargetBoundingBox(),
             self.config['AGGREGATION']['DEM'],
-            self.config['AGGREGATION']['DEM'] * (self.config['AGGREGATION']['TARGET_SQ_RESOLUTION'] + 5)
+            self.config['AGGREGATION']['DEM'] * (self.config['AGGREGATION']['TARGET_SQ_RESOLUTION'] * 2)
         )
         self.CreateAggregatedVRT(
             bounds=rounded_bounding_box
@@ -222,4 +227,41 @@ class ProcessRasterLayer(object):
         self.CreateTIFFromVRT()
         self.LoadRasterMetadata(self.dem_aggr_rst_fn)
         self.CreateBorderRaster()
+        return
+
+    def RasterizePopulationShapefile(self):
+
+        root_pop_path = '/mnt/share/mnt/RESEARCH/SATELLITE/GEOSTAT/POP_2011/Version 2_0_1/'
+
+        data = pd.concat(
+            [
+                pd.read_csv(root_pop_path + 'GEOSTAT_grid_POP_1K_2011_V2_0_1.csv'),
+                pd.read_csv(root_pop_path + 'JRC-GHSL_AIT-grid-POP_1K_2011.csv').astype({'TOT_P_CON_DT': 'object'})
+            ],
+            axis=0,
+            ignore_index=True
+        )
+
+        pop_shp_fn = root_pop_path + 'GEOSTATReferenceGrid/Grid_ETRS89_LAEA_1K-ref_GEOSTAT_POP_2011_V2_0_1.shp'
+        pop_shp = gpd.read_file(pop_shp_fn)
+        pop_shp = pop_shp.merge(data, on='GRD_ID', how='left')
+
+        self.dem_aggr_vrt_fn = self.root_work_path + 'dem_aggr_rst' + '.tif'
+        self.LoadRasterMetadata(self.dem_aggr_vrt_fn)
+        out_fn = self.root_work_path + 'pop_rst.tif'
+        with rasterio.open(out_fn, 'w+', **self.raster_metadata) as out_rst:
+
+            out_rst_data = out_rst.read(1)
+            shapes = ((geom, value) for geom, value in zip(pop_shp.geometry, pop_shp.TOT_P) if features.is_valid_geom(geom))
+
+            burned = features.rasterize(
+                shapes=shapes,
+                fill=0,
+                out=out_rst_data,
+                transform=out_rst.transform,
+                all_touched = True,
+                merge_alg = MergeAlg.replace
+            )
+            out_rst.write_band(1, burned)
+
         return
