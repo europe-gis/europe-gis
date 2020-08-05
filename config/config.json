@@ -1,10 +1,25 @@
 {
+    "CRS" : "epsg:3035",
     "DEM" : {
         "RESOLUTION": 25
     },
     "AGGREGATION" :  {
-        "DEM" : 40,
+        "DEM" : 1000,
         "TARGET_SQ_RESOLUTION" : 100
 
+    },
+    "FILES" : {
+        "NUTS" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_3.shp",
+        "POP" : "GEOSTATReferenceGrid/Grid_ETRS89_LAEA_1K-ref_GEOSTAT_POP_2011_V2_0_1.shp",
+        "POP_CSV" : [
+            "GEOSTAT_grid_POP_1K_2011_V2_0_1.csv",
+            "JRC-GHSL_AIT-grid-POP_1K_2011.csv"
+        ]
+    },
+    "ROOT_LOCATIONS" : {
+        "WORK" : "/mnt/share/mnt/RESEARCH/SATELLITE/WORK/",
+        "DEM" : "/mnt/share/mnt/RESEARCH/SATELLITE/DEM/",
+        "NUTS" : "/mnt/share/mnt/RESEARCH/SATELLITE/NUTS/",
+        "POP" : "/mnt/share/mnt/RESEARCH/SATELLITE/GEOSTAT/POP_2011/Version 2_0_1/"
     }
 }
