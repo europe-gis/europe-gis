@@ -182,7 +182,7 @@ class ProcessRasterLayer(object):
             src_fns = self.filepath.dem_source_fns
         vrt_fn = self.filepath.root_work_path + fn + '.vrt'
         vrt_options = gdal.BuildVRTOptions(
-            resampleAlg='cubic',
+            resampleAlg = gdal.GRA_Average,  # 'cubic',
             xRes = xy_resolution,
             yRes = xy_resolution,
             addAlpha=True,
@@ -198,12 +198,19 @@ class ProcessRasterLayer(object):
         return
 
     def CreateFullVRT(self):
-        self.CreateVRT('dem_full', xy_resolution=self.config['AGGREGATION']['DEM'])
+        self.CreateVRT(
+            'dem_full',
+            xy_resolution=self.config['AGGREGATION']['DEM']
+        )
         self.LoadRasterStatistics(self.filepath.dem_full_vrt_fn, 'dem_full')
         return
 
     def CreateAggregatedVRT(self, bounds=None):
-        self.CreateVRT('dem_aggr', bounds = bounds, xy_resolution=self.config['AGGREGATION']['DEM'])
+        self.CreateVRT(
+            'dem_aggr',
+            bounds = bounds,
+            xy_resolution=self.config['AGGREGATION']['DEM']
+        )
         self.LoadRasterStatistics(self.filepath.dem_aggr_vrt_fn, 'dem_aggr')
         return
 
@@ -273,7 +280,7 @@ class ProcessRasterLayer(object):
 
         return
 
-    def CreateBoundedRaster(self):
+    def CreateBoundedDEMRaster(self):
 
         self.CreateFullVRT()
         self.GetTargetBoundingBox()
