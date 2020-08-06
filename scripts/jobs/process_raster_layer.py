@@ -140,7 +140,7 @@ class ProcessRasterLayer(object):
 
         shp_fn = self.config['ROOT_LOCATIONS']['CB'] + self.config['FILES']['CB']
         self.country_borders = gpd.read_file(shp_fn).to_crs(self.config['CRS'])
-        self.country_borders = self.country_borders[~self.country_borders['FIPS'].isin(self.config['COUNTRY_CODE_LIST'])]
+        self.country_borders = self.country_borders[~self.country_borders['ISO2'].isin(self.config['COUNTRY_CODE_LIST'])]
 
         return
 
