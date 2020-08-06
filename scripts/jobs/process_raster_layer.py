@@ -136,6 +136,14 @@ class ProcessRasterLayer(object):
         self.nuts_borders = gpd.read_file(shp_fn).to_crs(self.config['CRS'])
         return
 
+    def LoadCountryBorderShapefile(self):
+
+        shp_fn = self.config['ROOT_LOCATIONS']['CB'] + self.config['FILES']['CB']
+        self.country_borders = gpd.read_file(shp_fn).to_crs(self.config['CRS'])
+        self.country_borders = self.country_borders[~self.country_borders['FIPS'].isin(self.config['COUNTRY_CODE_LIST'])]
+
+        return
+
     def GetTargetBoundingBox(self):
         if not hasattr(self, 'nuts_borders'):
             self.LoadBorderShapefile()
@@ -169,7 +177,9 @@ class ProcessRasterLayer(object):
 
         return
 
-    def CreateVRT(self, fn, bounds=None, xy_resolution = 100):
+    def CreateVRT(self, fn, bounds=None, xy_resolution = 100, src_fns = None):
+        if not src_fns:
+            src_fns = self.filepath.dem_source_fns
         vrt_fn = self.filepath.root_work_path + fn + '.vrt'
         vrt_options = gdal.BuildVRTOptions(
             resampleAlg='cubic',
@@ -180,7 +190,7 @@ class ProcessRasterLayer(object):
         )
         test_vrt = gdal.BuildVRT(
             vrt_fn,
-            self.filepath.dem_source_fns,
+            src_fns,
             options=vrt_options
         )
         test_vrt = None
@@ -197,6 +207,15 @@ class ProcessRasterLayer(object):
         self.LoadRasterStatistics(self.filepath.dem_aggr_vrt_fn, 'dem_aggr')
         return
 
+    def CreateAggregatedWWVRT(self, bounds=None):
+        self.CreateVRT(
+            'ww_aggr',
+            bounds = bounds,
+            xy_resolution=self.config['AGGREGATION']['DEM'],
+            src_fns=self.config['ROOT_LOCATIONS']['WW'] + self.config['FILES']['WW'])
+        self.LoadRasterStatistics(self.filepath.ww_aggr_vrt_fn, 'ww_aggr')
+        return
+
     def CreateTIFFromVRT(self, fn = 'dem_aggr_rst'):
         if hasattr(self.filepath, 'dem_aggr_vrt_fn'):
             dem_rst_fn = self.filepath.root_work_path + fn + '.tif'
@@ -204,6 +223,10 @@ class ProcessRasterLayer(object):
             setattr(self.filepath, fn + '_fn', dem_rst_fn)
         else:
             raise UserWarning
+        return
+
+    def BuildTIFFromVRT(self, in_vrt_fn, out_rst_fn):
+        gdal.Translate(out_rst_fn, in_vrt_fn)
         return
 
     def LoadRasterMetadata(self, rst_fn):
@@ -258,7 +281,7 @@ class ProcessRasterLayer(object):
         self.CreateAggregatedVRT(
             bounds=self.padded_bounding_box
         )
-        self.CreateTIFFromVRT()
+        self.CreateTIFFromVRT(fn = 'dem_aggr_rst')
         self.CreateBorderRaster()
         return
 
@@ -360,4 +383,42 @@ class ProcessRasterLayer(object):
             )
             out_rst.write_band(1, burned)
 
+        return
+
+    def CreateNonEUCountryRaster(self):
+        if not hasattr(self, 'nuts_borders'):
+            self.LoadCountryBorderShapefile()
+
+        in_rst_fn = self.filepath.root_work_path + 'dem_aggr_rst.tif'
+        if in_rst_fn not in self.raster_metadata:
+            self.LoadRasterMetadata(in_rst_fn)
+        out_rst_fn = self.filepath.root_work_path + 'cb_rst.tif'
+        with rasterio.open(out_rst_fn, 'w+', **self.raster_metadata[in_rst_fn]) as out_rst:
+
+            out_rst_data = out_rst.read(1)
+            shapes = ((geom, value) for geom, value in zip(self.country_borders.geometry, self.country_borders.shape[0] * [1]) if features.is_valid_geom(geom))
+
+            burned = features.rasterize(
+                shapes=shapes,
+                fill=0,
+                out=out_rst_data,
+                transform=out_rst.transform,
+                all_touched = True,
+                merge_alg = MergeAlg.replace
+            )
+            out_rst.write_band(1, burned)
+
+        return
+
+    def CreateBoundedWWRaster(self):
+
+        self.GetTargetBoundingBox()
+
+        self.CreateAggregatedWWVRT(
+            bounds=self.padded_bounding_box
+        )
+        self.BuildTIFFromVRT(
+            in_vrt_fn = self.config['ROOT_LOCATIONS']['WORK'] + 'ww_aggr.vrt',
+            out_rst_fn = self.config['ROOT_LOCATIONS']['WORK'] + 'ww_aggr_rst.tif'
+        )
         return

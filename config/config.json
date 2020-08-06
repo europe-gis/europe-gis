@@ -1,25 +1,37 @@
 {
-    "CRS" : "epsg:3035",
+    "CRS" : "epsg:3035", 
     "DEM" : {
         "RESOLUTION": 25
-    },
+    }, 
     "AGGREGATION" :  {
-        "DEM" : 1000,
+        "DEM" : 1000, 
         "TARGET_SQ_RESOLUTION" : 100
 
-    },
+    }, 
+    "COUNTRY_CODE_LIST" : [
+        "BE", "EL", "LT", "PT", "BG", "ES", "LU", "RO", "CZ", "FR", "HU", "SI", "DK", "HR", "MT", "SK", "DE", "IT", "NL", "FI", "EE", "CY", "AT", "SE", "IE", "LV", "PL", 
+        "UK", 
+        "IS", "NO", "LI", "CH",
+        "ME", "MK", "AL", "RS", "TR"
+    ], 
     "FILES" : {
-        "NUTS" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_3.shp",
-        "POP" : "GEOSTATReferenceGrid/Grid_ETRS89_LAEA_1K-ref_GEOSTAT_POP_2011_V2_0_1.shp",
+        "NUTS" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_3.shp", 
+        "POP" : "GEOSTATReferenceGrid/Grid_ETRS89_LAEA_1K-ref_GEOSTAT_POP_2011_V2_0_1.shp", 
         "POP_CSV" : [
-            "GEOSTAT_grid_POP_1K_2011_V2_0_1.csv",
+            "GEOSTAT_grid_POP_1K_2011_V2_0_1.csv", 
             "JRC-GHSL_AIT-grid-POP_1K_2011.csv"
-        ]
-    },
+        ], 
+        "WW" : "WWPI_2015_020m_eu_03035_d06_full.tif", 
+        "CB" : "countries.shp", 
+        "CLC" : "CLC2018_CLC2018_V2018_20.tif"
+    }, 
     "ROOT_LOCATIONS" : {
-        "WORK" : "/mnt/share/mnt/RESEARCH/SATELLITE/WORK/",
-        "DEM" : "/mnt/share/mnt/RESEARCH/SATELLITE/DEM/",
-        "NUTS" : "/mnt/share/mnt/RESEARCH/SATELLITE/NUTS/",
-        "POP" : "/mnt/share/mnt/RESEARCH/SATELLITE/GEOSTAT/POP_2011/Version 2_0_1/"
+        "WORK" : "/mnt/share/mnt/RESEARCH/SATELLITE/WORK/", 
+        "DEM" : "/mnt/share/mnt/RESEARCH/SATELLITE/DEM/", 
+        "NUTS" : "/mnt/share/mnt/RESEARCH/SATELLITE/NUTS/", 
+        "POP" : "/mnt/share/mnt/RESEARCH/SATELLITE/GEOSTAT/POP_2011/Version 2_0_1/", 
+        "WW" : "/mnt/share/mnt/RESEARCH/SATELLITE/WW/WWPI_2015_020m_eu_03035_d06_Full/", 
+        "CB" : "/mnt/share/mnt/RESEARCH/SATELLITE/COUNTRIES/", 
+        "CLC" : "/mnt/share/mnt/RESEARCH/SATELLITE/CLC/2018/clc2018_clc2018_v2018_20_raster100m/"
     }
 }
