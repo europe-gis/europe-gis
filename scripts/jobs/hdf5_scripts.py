@@ -103,3 +103,13 @@ def read_many_hdf5(num_images):
     labels = np.array(file["/meta"]).astype("uint8")
 
     return images, labels
+
+
+class generator:
+    def __init__(self, file):
+        self.file = file
+
+    def __call__(self):
+        with h5py.File(self.file, 'r') as hf:
+            for im in hf["train_img"]:
+                yield im
