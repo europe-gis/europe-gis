@@ -15,7 +15,7 @@ def ReadRasterFile(input_fn):
 def CreateStridedArray(raster, window_size = 28):
     step = 0
     result = np.zeros(((raster.shape[0] - window_size + 1) * (raster.shape[1] - window_size + 1), window_size, window_size, 1))
-
+    limit = 10000000
     bad_value = -1
 
     for i in range(0, raster.shape[0] - window_size + 1):
@@ -23,10 +23,13 @@ def CreateStridedArray(raster, window_size = 28):
             if np.amin(raster[i:i + window_size, j:j + window_size]) > bad_value:
                 result[step, :, :, 0] = raster[i:i + window_size, j:j + window_size]
                 step += 1
-    step = 1000
+        if step > limit:
+            break
     result = result[0:step - 1]
     train_size = int(0.8 * step)
-    train, test = np.vsplit(result[np.random.permutation(result.shape[0])], train_size)
+    shuffle = result[np.random.permutation(result.shape[0])]
+    train = shuffle[0:train_size]
+    test = shuffle[train_size:]
     return train, test
 
 
@@ -51,7 +54,7 @@ def CreateTFDataset(input_array):
     return train_dataset, test_dataset
 
 
-def StoreDataHDF5(input_array):
+def StoreDataHDF5(input_array, fn):
     """ Stores an array of images to HDF5.
         Parameters:
         ---------------
@@ -60,7 +63,7 @@ def StoreDataHDF5(input_array):
     """
 
     # Create a new HDF5 file
-    file = h5py.File(hdf5_dir / "test.h5", "w")
+    file = h5py.File(hdf5_dir + fn + ".h5", "w")
 
     # Create a dataset in the file
     dataset = file.create_dataset(
@@ -79,9 +82,9 @@ class HDF5Generator:
                 yield im
 
 
-def CreateTFDatasetFromGenerator():
+def CreateTFDatasetFromGenerator(fn):
 
-    gen = HDF5Generator(hdf5_dir + "test.h5")
+    gen = HDF5Generator(hdf5_dir + fn + ".h5")
 
     full_dataset = tf.data.Dataset.from_generator(gen, tf.float32)
     full_dataset = full_dataset.shuffle(1000)

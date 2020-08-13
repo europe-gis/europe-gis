@@ -88,16 +88,17 @@ def log_normal_pdf(sample, mean, logvar, raxis=1):
 
 
 def compute_loss(model, x):
+    x = tf.dtypes.cast(x, tf.float32)
     mean, logvar = model.encode(x)
     z = model.reparameterize(mean, logvar)
     x_logit = model.decode(z)
-    x_logit = tf.dtypes.cast(x_logit, tf.float64)
+    x_logit = tf.dtypes.cast(x_logit, tf.float32)
     cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
     logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
     logpz = log_normal_pdf(z, 0., 0.)
     logqz_x = log_normal_pdf(z, mean, logvar)
-    logpz = tf.dtypes.cast(logpz, tf.float64)
-    logqz_x = tf.dtypes.cast(logqz_x, tf.float64)
+    logpz = tf.dtypes.cast(logpz, tf.float32)
+    logqz_x = tf.dtypes.cast(logqz_x, tf.float32)
     return -tf.reduce_mean(logpx_z + logpz - logqz_x)
 
 
@@ -115,9 +116,9 @@ class CVAE(tf.keras.Model):
             [
                 tf.keras.layers.InputLayer(input_shape=(28, 28, 1)),
                 tf.keras.layers.Conv2D(
-                    filters=32, kernel_size=3, strides=(2, 2), activation='relu'),
+                    filters=256, kernel_size=3, strides=(2, 2), activation='relu'),
                 tf.keras.layers.Conv2D(
-                    filters=64, kernel_size=3, strides=(2, 2), activation='relu'),
+                    filters=512, kernel_size=3, strides=(2, 2), activation='relu'),
                 tf.keras.layers.Flatten(),
                 # No activation
                 tf.keras.layers.Dense(latent_dim + latent_dim),
@@ -127,13 +128,13 @@ class CVAE(tf.keras.Model):
         self.decoder = tf.keras.Sequential(
             [
                 tf.keras.layers.InputLayer(input_shape=(latent_dim,)),
-                tf.keras.layers.Dense(units=7 * 7 * 32, activation=tf.nn.relu),
-                tf.keras.layers.Reshape(target_shape=(7, 7, 32)),
+                tf.keras.layers.Dense(units=7 * 7 * 256, activation=tf.nn.relu),
+                tf.keras.layers.Reshape(target_shape=(7, 7, 256)),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=64, kernel_size=3, strides=2, padding='same',
+                    filters=512, kernel_size=3, strides=2, padding='same',
                     activation='relu'),
                 tf.keras.layers.Conv2DTranspose(
-                    filters=32, kernel_size=3, strides=2, padding='same',
+                    filters=256, kernel_size=3, strides=2, padding='same',
                     activation='relu'),
                 # No activation
                 tf.keras.layers.Conv2DTranspose(
@@ -179,8 +180,7 @@ class CVAE(tf.keras.Model):
     @tf.function
     def test_step(self, x):
         t_loss = compute_loss(self, x)
-        test_loss.update_state(t_loss)
-        return {"loss": test_loss.result()}
+        return {"loss": t_loss}
 
     @tf.function
     def sample(self, eps=None):
@@ -190,22 +190,26 @@ class CVAE(tf.keras.Model):
 
     def BatchTrain(self, train_ds, STEPS_PER_EPOCH):
         train_loss.reset_states()
+        test_loss.reset_states()
 
         i = 0
+        loss_list = []
         for image in train_ds:
-            self.train_step(
-                tf.expand_dims(
-                    image,
-                    axis=0
+            loss_list.append(self.train_step(
+                tf.dtypes.cast(
+                    tf.expand_dims(
+                        image,
+                        axis=0
+                    ),
+                    tf.float32
                 )
-            )
+            )['loss'])
             i += 1
             if i > STEPS_PER_EPOCH:
                 break
+        train_loss.update_state(loss_list)
 
-        loss = train_loss.result().numpy()
-
-        return {"loss": train_loss.result()}
+        return {"training_loss": train_loss.result().numpy()}
 
 
 def TrainModel(train_ds, test_ds):
@@ -213,32 +217,39 @@ def TrainModel(train_ds, test_ds):
     model = CVAE(10)
     optimizer = tf.keras.optimizers.Adam(1e-4)
     STEPS_PER_EPOCH = 1000
-    EPOCHS = 5
+    EPOCHS = 100
     model.compile(
         optimizer=optimizer
     )
     for epoch in range(EPOCHS):
-        model.BatchTrain(train_ds, STEPS_PER_EPOCH)
+        print(model.BatchTrain(train_ds, STEPS_PER_EPOCH))
 
-        # for image in train_ds:
-        #     model.train_step(
-        #         tf.expand_dims(
-        #             image,
-        #             axis=0
-        #         )
-        #     )
-
+        i = 0
+        fig = pyplot.figure(figsize=(10, 10))
+        loss_list = []
         for image in test_ds:
+            loss_list.append(model.test_step(
+                tf.expand_dims(
+                    image,
+                    axis=0
+                )
+            )['loss'])
+
+            pyplot.subplot(10, 8, i + 1)
             pyplot.imshow(image, cmap='pink')
-            pyplot.show()
             pred = model.call(
                 tf.expand_dims(
                     image,
                     axis=0
                 )
             )
+            pyplot.subplot(10, 8, i + 2)
             pyplot.imshow(tf.squeeze(pred), cmap='pink')
-            pyplot.show()
-            break
+            i += 2
+            if i > 10 * 4:
+                test_loss.update_state(loss_list)
+                print({"validation_loss": test_loss.result().numpy()})
+                pyplot.show()
+                break
 
     return model
