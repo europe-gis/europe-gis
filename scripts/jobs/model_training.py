@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as pyplot
 
 
 class BorderRecognitionNetwork(object):
@@ -79,6 +80,31 @@ class BorderRecognitionNetwork(object):
         return siamese_net
 
 
+def log_normal_pdf(sample, mean, logvar, raxis=1):
+    log2pi = tf.math.log(2. * np.pi)
+    return tf.reduce_sum(
+        -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
+        axis=raxis)
+
+
+def compute_loss(model, x):
+    mean, logvar = model.encode(x)
+    z = model.reparameterize(mean, logvar)
+    x_logit = model.decode(z)
+    x_logit = tf.dtypes.cast(x_logit, tf.float64)
+    cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
+    logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+    logpz = log_normal_pdf(z, 0., 0.)
+    logqz_x = log_normal_pdf(z, mean, logvar)
+    logpz = tf.dtypes.cast(logpz, tf.float64)
+    logqz_x = tf.dtypes.cast(logqz_x, tf.float64)
+    return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+
+
+train_loss = tf.keras.metrics.Mean(name='train_loss')
+test_loss = tf.keras.metrics.Mean(name='test_loss')
+
+
 class CVAE(tf.keras.Model):
     """Convolutional variational autoencoder."""
     """https://www.tensorflow.org/tutorials/generative/cvae"""
@@ -115,12 +141,6 @@ class CVAE(tf.keras.Model):
             ]
         )
 
-    @tf.function
-    def sample(self, eps=None):
-        if eps is None:
-            eps = tf.random.normal(shape=(100, self.latent_dim))
-        return self.decode(eps, apply_sigmoid=True)
-
     def encode(self, x):
         mean, logvar = tf.split(self.encoder(x), num_or_size_splits=2, axis=1)
         return mean, logvar
@@ -133,58 +153,92 @@ class CVAE(tf.keras.Model):
         logits = self.decoder(z)
         if apply_sigmoid:
             probs = tf.sigmoid(logits)
-        return probs
+            return probs
         return logits
 
+    def call(self, x):
+        mean, logvar = self.encode(x)
+        z = self.reparameterize(mean, logvar)
+        predictions = self.sample(z)
+        return predictions
 
-def log_normal_pdf(sample, mean, logvar, raxis=1):
-    log2pi = tf.math.log(2. * np.pi)
-    return tf.reduce_sum(
-        -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
-        axis=raxis)
+    @tf.function
+    def train_step(self, x):
+        """Executes one training step and returns the loss.
+
+        This function computes the loss and gradients, and uses the latter to
+        update the model's parameters.
+        """
+        with tf.GradientTape() as tape:
+            loss = compute_loss(self, x)
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+        train_loss.update_state(loss)
+        return {"loss": train_loss.result()}
+
+    @tf.function
+    def test_step(self, x):
+        t_loss = compute_loss(self, x)
+        test_loss.update_state(t_loss)
+        return {"loss": test_loss.result()}
+
+    @tf.function
+    def sample(self, eps=None):
+        if eps is None:
+            eps = tf.random.normal(shape=(100, self.latent_dim))
+        return self.decode(eps, apply_sigmoid=True)
+
+    def BatchTrain(self, train_ds, STEPS_PER_EPOCH):
+        train_loss.reset_states()
+
+        i = 0
+        for image in train_ds:
+            self.train_step(
+                tf.expand_dims(
+                    image,
+                    axis=0
+                )
+            )
+            i += 1
+            if i > STEPS_PER_EPOCH:
+                break
+
+        loss = train_loss.result().numpy()
+
+        return {"loss": train_loss.result()}
 
 
-def compute_loss(model, x):
-    mean, logvar = model.encode(x)
-    z = model.reparameterize(mean, logvar)
-    x_logit = model.decode(z)
-    cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
-    logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
-    logpz = log_normal_pdf(z, 0., 0.)
-    logqz_x = log_normal_pdf(z, mean, logvar)
-    return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+def TrainModel(train_ds, test_ds):
 
+    model = CVAE(10)
+    optimizer = tf.keras.optimizers.Adam(1e-4)
+    STEPS_PER_EPOCH = 1000
+    EPOCHS = 5
+    model.compile(
+        optimizer=optimizer
+    )
+    for epoch in range(EPOCHS):
+        model.BatchTrain(train_ds, STEPS_PER_EPOCH)
 
-@tf.function
-def train_step(model, x, optimizer):
-    """Executes one training step and returns the loss.
+        # for image in train_ds:
+        #     model.train_step(
+        #         tf.expand_dims(
+        #             image,
+        #             axis=0
+        #         )
+        #     )
 
-    This function computes the loss and gradients, and uses the latter to
-    update the model's parameters.
-    """
-    with tf.GradientTape() as tape:
-        loss = compute_loss(model, x)
-    gradients = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        for image in test_ds:
+            pyplot.imshow(image, cmap='pink')
+            pyplot.show()
+            pred = model.call(
+                tf.expand_dims(
+                    image,
+                    axis=0
+                )
+            )
+            pyplot.imshow(tf.squeeze(pred), cmap='pink')
+            pyplot.show()
+            break
 
-
-
-model = CVAE(2)
-optimizer = tf.keras.optimizers.Adam(1e-4)
-EPOCHS = 5
-
-for epoch in range(EPOCHS):
-
-  for images in train_ds:
-    train_step(model, images)
-
-  template = 'Epoch {}, Loss: {}, Accuracy: {}, Test Loss: {}, Test Accuracy: {}'
-  print(template.format(epoch + 1,
-                        train_loss.result(),
-                        train_accuracy.result() * 100,
-                        test_loss.result(),
-                        test_accuracy.result() * 100))
-
-
-# vae.compile(optimizer=keras.optimizers.Adam())
-# vae.fit(mnist_digits, epochs=30, batch_size=128)
+    return model
