@@ -136,40 +136,55 @@ class CVAE(tf.keras.Model):
         return probs
         return logits
 
-    optimizer = tf.keras.optimizers.Adam(1e-4)
 
-    def log_normal_pdf(sample, mean, logvar, raxis=1):
-        log2pi = tf.math.log(2. * np.pi)
-        return tf.reduce_sum(
-            -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
-            axis=raxis)
-
-
-    def compute_loss(model, x):
-        mean, logvar = model.encode(x)
-        z = model.reparameterize(mean, logvar)
-        x_logit = model.decode(z)
-        cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
-        logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
-        logpz = log_normal_pdf(z, 0., 0.)
-        logqz_x = log_normal_pdf(z, mean, logvar)
-        return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+def log_normal_pdf(sample, mean, logvar, raxis=1):
+    log2pi = tf.math.log(2. * np.pi)
+    return tf.reduce_sum(
+        -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
+        axis=raxis)
 
 
-    @tf.function
-    def train_step(model, x, optimizer):
-        """Executes one training step and returns the loss.
-
-        This function computes the loss and gradients, and uses the latter to
-        update the model's parameters.
-        """
-        with tf.GradientTape() as tape:
-            loss = compute_loss(model, x)
-        gradients = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+def compute_loss(model, x):
+    mean, logvar = model.encode(x)
+    z = model.reparameterize(mean, logvar)
+    x_logit = model.decode(z)
+    cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(logits=x_logit, labels=x)
+    logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+    logpz = log_normal_pdf(z, 0., 0.)
+    logqz_x = log_normal_pdf(z, mean, logvar)
+    return -tf.reduce_mean(logpx_z + logpz - logqz_x)
 
 
+@tf.function
+def train_step(model, x, optimizer):
+    """Executes one training step and returns the loss.
 
-vae = VAE(encoder, decoder)
-vae.compile(optimizer=keras.optimizers.Adam())
-vae.fit(mnist_digits, epochs=30, batch_size=128)
+    This function computes the loss and gradients, and uses the latter to
+    update the model's parameters.
+    """
+    with tf.GradientTape() as tape:
+        loss = compute_loss(model, x)
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+
+
+model = CVAE(2)
+optimizer = tf.keras.optimizers.Adam(1e-4)
+EPOCHS = 5
+
+for epoch in range(EPOCHS):
+
+  for images in train_ds:
+    train_step(model, images)
+
+  template = 'Epoch {}, Loss: {}, Accuracy: {}, Test Loss: {}, Test Accuracy: {}'
+  print(template.format(epoch + 1,
+                        train_loss.result(),
+                        train_accuracy.result() * 100,
+                        test_loss.result(),
+                        test_accuracy.result() * 100))
+
+
+# vae.compile(optimizer=keras.optimizers.Adam())
+# vae.fit(mnist_digits, epochs=30, batch_size=128)

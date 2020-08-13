@@ -17,3 +17,16 @@ def CreateStridedArray(raster, window_size = 28):
             step += 1
 
     return result
+
+
+def CreateTFDataset(input_array):
+
+    full_dataset = tf.data.Dataset.from_tensor_slices((train_examples))
+    DATASET_SIZE = train_examples.shape[0]
+    train_size = int(0.8 * DATASET_SIZE)
+    test_size = DATASET_SIZE - train_size
+
+    full_dataset = full_dataset.shuffle()
+    train_dataset = full_dataset.take(train_size)
+    test_dataset = full_dataset.skip(train_size)
+    return train_dataset, test_dataset
