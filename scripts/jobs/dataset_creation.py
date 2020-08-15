@@ -84,8 +84,12 @@ class HDF5Generator:
 
 def CreateTFDatasetFromGenerator(fn):
 
+    batch_size = 64
+
     gen = HDF5Generator(hdf5_dir + fn + ".h5")
 
-    full_dataset = tf.data.Dataset.from_generator(gen, tf.float32)
-    full_dataset = full_dataset.shuffle(1000)
+    full_dataset = tf.data.Dataset.from_generator(gen, tf.float32, output_shapes=(28, 28, 1))
+    full_dataset = full_dataset.batch(batch_size)
+    # full_dataset = full_dataset.shuffle(1000)
+    full_dataset = full_dataset.repeat()
     return full_dataset
