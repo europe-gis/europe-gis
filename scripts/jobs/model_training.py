@@ -215,10 +215,10 @@ class CCVAE(tf.keras.Model):
 
 def TrainCCVAEModel(train_ds, test_ds):
 
-    model = CCVAE(2)
+    model = CCVAE(10)
     optimizer = tf.keras.optimizers.Adam(1e-4)
-    STEPS_PER_EPOCH = 10000
-    EPOCHS = 100
+    STEPS_PER_EPOCH = 64
+    EPOCHS = 10000
     model.compile(
         optimizer=optimizer
     )
@@ -247,7 +247,7 @@ def TrainCCVAEModel(train_ds, test_ds):
             pyplot.subplot(10, 8, i + 2)
             pyplot.imshow(tf.squeeze(pred), cmap='pink')
             i += 2
-            if i > 10 * 4:
+            if i > 10 * 4 + 2:
                 test_loss.update_state(loss_list)
                 print({"validation_loss": test_loss.result().numpy()})
                 pyplot.show()
@@ -260,7 +260,7 @@ class CAE(tf.keras.Model):
     """https://medium.com/red-buffer/autoencoders-guide-and-code-in-tensorflow-2-0-a4101571ce56"""
     def __init__(self):
         super(CAE, self).__init__()
-        filter_base = 8
+        filter_base = 8 * 1
         latent_dim = 10
 
         self.conv1 = tf.keras.layers.Conv2D(2 * filter_base, (3, 3), activation='relu', padding='same')
@@ -273,8 +273,8 @@ class CAE(tf.keras.Model):
 
         self.encoded_flatten = tf.keras.layers.Flatten()
         self.latent = tf.keras.layers.Dense(latent_dim)
-        self.rebuild = tf.keras.layers.Dense(128)
-        self.reshape = tf.keras.layers.Reshape((4, 4, 8))
+        self.rebuild = tf.keras.layers.Dense(4 * 4 * filter_base)
+        self.reshape = tf.keras.layers.Reshape((4, 4, filter_base))
 
         self.conv4 = tf.keras.layers.Conv2D(filter_base, (3, 3), activation='relu', padding='same')
         self.upsample1 = tf.keras.layers.UpSampling2D((2, 2))
@@ -332,7 +332,7 @@ def grad(model, inputs, targets):
 def TrainCAEModel(train_ds, test_ds):
 
     model = CAE()
-    optimizer = tf.optimizers.Adam(learning_rate=0.001)
+    optimizer = tf.optimizers.Adam(learning_rate=0.1)  # 0.001
     num_epochs = 100
     batch_size = 256
     for epoch in range(num_epochs):
@@ -348,9 +348,9 @@ def TrainCAEModel(train_ds, test_ds):
             )
 
             print("Loss: {}".format(
-                np.sum(loss(x_inp, reconstruction).numpy()))
+                np.sum(loss(x_inp, reconstruction).numpy()) / batch_size)
             )
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             x_test = np.stack(list(itertools.islice(test_ds, 40)), axis=0)
             i = 0
             fig = pyplot.figure(figsize=(10, 10))
