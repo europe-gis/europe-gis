@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as pyplot
@@ -106,11 +107,11 @@ train_loss = tf.keras.metrics.Mean(name='train_loss')
 test_loss = tf.keras.metrics.Mean(name='test_loss')
 
 
-class CVAE(tf.keras.Model):
+class CCVAE(tf.keras.Model):
     """Convolutional variational autoencoder."""
     """https://www.tensorflow.org/tutorials/generative/cvae"""
     def __init__(self, latent_dim):
-        super(CVAE, self).__init__()
+        super(CCVAE, self).__init__()
         self.latent_dim = latent_dim
         self.encoder = tf.keras.Sequential(
             [
@@ -212,11 +213,11 @@ class CVAE(tf.keras.Model):
         return {"training_loss": train_loss.result().numpy()}
 
 
-def TrainModel(train_ds, test_ds):
+def TrainCCVAEModel(train_ds, test_ds):
 
-    model = CVAE(10)
+    model = CCVAE(2)
     optimizer = tf.keras.optimizers.Adam(1e-4)
-    STEPS_PER_EPOCH = 1000
+    STEPS_PER_EPOCH = 10000
     EPOCHS = 100
     model.compile(
         optimizer=optimizer
@@ -251,5 +252,118 @@ def TrainModel(train_ds, test_ds):
                 print({"validation_loss": test_loss.result().numpy()})
                 pyplot.show()
                 break
+
+    return model
+
+
+class CAE(tf.keras.Model):
+    """https://medium.com/red-buffer/autoencoders-guide-and-code-in-tensorflow-2-0-a4101571ce56"""
+    def __init__(self):
+        super(CAE, self).__init__()
+        filter_base = 8
+        latent_dim = 10
+
+        self.conv1 = tf.keras.layers.Conv2D(2 * filter_base, (3, 3), activation='relu', padding='same')
+        self.maxp1 = tf.keras.layers.MaxPooling2D((2, 2), padding='same')
+        self.conv2 = tf.keras.layers.Conv2D(filter_base, (3, 3), activation='relu', padding='same')
+        self.maxp2 = tf.keras.layers.MaxPooling2D((2, 2), padding='same')
+        self.conv3 = tf.keras.layers.Conv2D(filter_base, (3, 3), activation='relu', padding='same')
+
+        self.encoded = tf.keras.layers.MaxPooling2D((2, 2), padding='same')
+
+        self.encoded_flatten = tf.keras.layers.Flatten()
+        self.latent = tf.keras.layers.Dense(latent_dim)
+        self.rebuild = tf.keras.layers.Dense(128)
+        self.reshape = tf.keras.layers.Reshape((4, 4, 8))
+
+        self.conv4 = tf.keras.layers.Conv2D(filter_base, (3, 3), activation='relu', padding='same')
+        self.upsample1 = tf.keras.layers.UpSampling2D((2, 2))
+        self.conv5 = tf.keras.layers.Conv2D(filter_base, (3, 3), activation='relu', padding='same')
+        self.upsample2 = tf.keras.layers.UpSampling2D((2, 2))
+        self.conv6 = tf.keras.layers.Conv2D(2 * filter_base, (3, 3), activation='relu')
+        self.upsample3 = tf.keras.layers.UpSampling2D((2, 2))
+        self.conv7 = tf.keras.layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')
+
+    def call(self, x):
+        x = self.conv1(x)
+        x = self.maxp1(x)
+        x = self.conv2(x)
+        x = self.maxp2(x)
+        x = self.conv3(x)
+        x = self.encoded(x)
+
+        x = self.encoded_flatten(x)
+        x = self.latent(x)
+        x = self.rebuild(x)
+        x = self.reshape(x)
+
+        x = self.conv4(x)
+        x = self.upsample1(x)
+        x = self.conv5(x)
+        x = self.upsample2(x)
+        x = self.conv6(x)
+        x = self.upsample3(x)
+        x = self.conv7(x)
+        return x
+
+    def encode(self, x):
+        x = self.conv1(x)
+        x = self.maxp1(x)
+        x = self.conv2(x)
+        x = self.maxp2(x)
+        x = self.conv3(x)
+        x = self.encoded(x)
+        x = self.encoded_flatten(x)
+        x = self.latent(x)
+        return x
+
+
+def loss(x, x_bar):
+    return tf.losses.mean_squared_error(x, x_bar)
+
+
+def grad(model, inputs, targets):
+    with tf.GradientTape() as tape:
+        reconstruction = model(inputs)
+        loss_value = loss(targets, reconstruction)
+    return loss_value, tape.gradient(loss_value, model.trainable_variables), reconstruction
+
+
+def TrainCAEModel(train_ds, test_ds):
+
+    model = CAE()
+    optimizer = tf.optimizers.Adam(learning_rate=0.001)
+    num_epochs = 100
+    batch_size = 256
+    for epoch in range(num_epochs):
+        print("Epoch: ", epoch)
+        for x in range(0, 10):
+            x_inp = np.stack(list(itertools.islice(train_ds, batch_size)), axis=0)
+            loss_value, grads, reconstruction = grad(model, x_inp, x_inp)
+            optimizer.apply_gradients(
+                zip(
+                    grads,
+                    model.trainable_variables
+                )
+            )
+
+            print("Loss: {}".format(
+                np.sum(loss(x_inp, reconstruction).numpy()))
+            )
+        if epoch % 10 == 0:
+            x_test = np.stack(list(itertools.islice(test_ds, 40)), axis=0)
+            i = 0
+            fig = pyplot.figure(figsize=(10, 10))
+            for image in x_test:
+                pyplot.subplot(10, 8, i + 1)
+                pyplot.imshow(image, cmap='pink')
+                pred = model(tf.expand_dims(
+                    image,
+                    axis=0
+                ))
+                pyplot.subplot(10, 8, i + 2)
+                pyplot.imshow(tf.squeeze(pred), cmap='pink')
+                i += 2
+            pyplot.show()
 
     return model
