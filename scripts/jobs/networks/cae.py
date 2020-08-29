@@ -21,7 +21,7 @@ class CAE(tf.keras.Model):
         super(CAE, self).__init__()
         filter_base = 128
         filter_multiplicator = 1
-        latent_dim = 10
+        latent_dim = 64
 
         self.encoder = tf.keras.Sequential(
             [

@@ -3,8 +3,7 @@ import rasterio
 import tensorflow as tf
 
 
-def PredictRaster(raster_data, model, channels = 10):
-    stride = 28
+def PredictAutoencoderRaster(raster_data, model, channels = 10, stride = 28):
     channels += 1
     data = np.zeros((raster_data.shape[0], raster_data.shape[1], channels))
 
@@ -31,7 +30,42 @@ def PredictRaster(raster_data, model, channels = 10):
     return data
 
 
+def PredictClassifierRaster(raster_data, model, stride = 28, bad_value = -1000):
+    data = np.zeros((raster_data.shape[0], raster_data.shape[1]))
+
+    total_step = 100
+    for i in range(0, raster_data.shape[0] - stride, total_step):
+        for j in range(0, raster_data.shape[1] - stride):
+            if i + total_step > raster_data.shape[0] - stride:
+                step = raster_data.shape[0] - stride - i
+            else:
+                step = total_step
+
+            windows = np.stack([raster_data[i + s:i + s + stride, j:j + stride] for s in range(step)], axis=0)
+            windows = tf.expand_dims(
+                windows,
+                axis=-1
+            )
+            pred = model.predict(windows)
+            data[i + int(round(stride / 2, 0)):i + int(round(stride / 2, 0)) + step, j + int(round(stride / 2, 0))] = pred
+            # window = raster_data[i:i + stride, j:j + stride]
+            # if np.min(window) > -bad_value:
+            #     window = tf.expand_dims(
+            #         tf.expand_dims(
+            #             window,
+            #             axis=0
+            #         ),
+            #         axis=-1
+            #     )
+            #     pred = model.predict(window)
+            #     data[i + int(round(stride / 2, 0)), j + int(round(stride / 2, 0))] = pred
+
+    return data
+
+
 def WriteResultRaster(data, src_fn, out_rst_fn, channels = 10):
+    if len(data.shape) < 3:
+        data = np.expand_dims(data, axis=2)
     data = data.astype('float32')
     channels += 1
     rst = rasterio.open(src_fn)
