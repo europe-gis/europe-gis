@@ -30,10 +30,9 @@ def PredictAutoencoderRaster(raster_data, model, channels = 10, stride = 28):
     return data
 
 
-def PredictClassifierRaster(raster_data, model, stride = 28, bad_value = -1000):
+def PredictClassifierRaster(raster_data, model, stride = 28, bad_value = -1000, channel_n = 1, total_step = 100):
     data = np.zeros((raster_data.shape[0], raster_data.shape[1]))
 
-    total_step = 100
     for i in range(0, raster_data.shape[0] - stride, total_step):
         for j in range(0, raster_data.shape[1] - stride):
             if i + total_step > raster_data.shape[0] - stride:
@@ -42,12 +41,13 @@ def PredictClassifierRaster(raster_data, model, stride = 28, bad_value = -1000):
                 step = total_step
 
             windows = np.stack([raster_data[i + s:i + s + stride, j:j + stride] for s in range(step)], axis=0)
-            windows = tf.expand_dims(
-                windows,
-                axis=-1
-            )
+            if channel_n == 1:
+                windows = tf.expand_dims(
+                    windows,
+                    axis=-1
+                )
             pred = model.predict(windows)
-            data[i + int(round(stride / 2, 0)):i + int(round(stride / 2, 0)) + step, j + int(round(stride / 2, 0))] = pred
+            data[i + int(round(stride / 2, 0)):i + int(round(stride / 2, 0)) + step, j + int(round(stride / 2, 0))] = np.squeeze(pred)
             # window = raster_data[i:i + stride, j:j + stride]
             # if np.min(window) > -bad_value:
             #     window = tf.expand_dims(

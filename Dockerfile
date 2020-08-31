@@ -233,6 +233,9 @@ RUN pip3 install \
 RUN pip3 install \
     git+git://github.com/geopandas/geopandas.git
 
+RUN pip3 matplotlib \
+    tqdn
+
 WORKDIR /app
 
 COPY . /app
