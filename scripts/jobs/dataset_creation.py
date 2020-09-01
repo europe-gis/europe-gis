@@ -113,10 +113,9 @@ def create_generator_sequence(rasters, window_size = 28):
     return generator_sequence
 
 
-class InMemoryStridedArrayGenerator:
-    def __init__(self, rasters, window_size = 28, generator_sequence = None):
+class SequenceSeparator():
+    def __init__(self, rasters, window_size = 28):
         self.window_size = window_size
-        rasters = rasters
         input_rasters = []
         for key in rasters:
             if rasters[key]['type'] == 'input':
@@ -125,11 +124,34 @@ class InMemoryStridedArrayGenerator:
             else:
                 self.output_raster = rasters[key]['data']
         self.input_data = np.stack(input_rasters, axis = -1)
-        if not generator_sequence:
-            self.generator_sequence = random.sample(list(itertools.product(range(0, raster_shape[0] - window_size + 1), range(0, raster_shape[1] - window_size + 1))), (raster_shape[0] - window_size + 1) * (raster_shape[1] - window_size + 1))
-        else:
-            self.generator_sequence = generator_sequence
-        self.gen = (n for n in self.generator_sequence)
+
+    def separate_sequence(self, sequence):
+        seq = []
+        for (i, j) in sequence:
+            if (np.amin(self.input_data[i:i + self.window_size, j:j + self.window_size]) > -1000) & (np.amin(self.output_raster[i:i + self.window_size, j:j + self.window_size]) > -1):
+                if len(seq) <= self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))]:
+                    seq.append([])
+                seq[int(self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))])].append((i, j))
+        self.generator_sequences = seq
+
+    def __call__(self, generator_sequence = None):
+        self.separate_sequence(generator_sequence)
+        return self.generator_sequences
+
+
+class InMemoryStridedArrayGenerator:
+    def __init__(self, rasters, window_size = 28, generator_sequences = None):
+        self.window_size = window_size
+        self.generator_sequences = generator_sequences
+        input_rasters = []
+        for key in rasters:
+            if rasters[key]['type'] == 'input':
+                raster_shape = rasters[key]['data'].shape
+                input_rasters.append(rasters[key]['data'])
+            else:
+                self.output_raster = rasters[key]['data']
+        self.input_data = np.stack(input_rasters, axis = -1)
+        self.restart_all_generators()
         self.state = 0
 
     def __iter__(self):
@@ -138,21 +160,24 @@ class InMemoryStridedArrayGenerator:
     def __next__(self):
         return self.next()
 
+    def restart_all_generators(self):
+        self.generators = [] * len(self.generator_sequences)
+        self.generators = [(n for n in random.sample(sequence, len(sequence))) for sequence in self.generator_sequences]
+
+    def restart_specific_generator(self, index):
+        self.generator_sequences[index] = random.sample(self.generator_sequences[index], len(self.generator_sequences[index]))
+        self.generators[index] = (n for n in self.generator_sequences[index])
+
     def next(self):
-        while True:
-            i, j = next(self.gen)
-            if (self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))] == self.state):
-                if (np.amin(self.input_data[i:i + self.window_size, j:j + self.window_size]) > -1000) & (np.amin(self.output_raster[i:i + self.window_size, j:j + self.window_size]) > -1):  # (np.amin(self.input_data[:, i:i + self.window_size, j:j + self.window_size]) > -1000) & 
-                    self.state = 1 - self.state
-                    return self.input_data[i:i + self.window_size, j:j + self.window_size], [self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))]]
-                    # return np.expand_dims(np.squeeze(self.input_data[:, i:i + self.window_size, j:j + self.window_size]), axis = -1), [self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))]]
+        i, j = next(self.generators[self.state])
+        self.state = 1 - self.state
+        return self.input_data[i:i + self.window_size, j:j + self.window_size], [self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))]]
 
     def __call__(self):
         try:
             yield self.next()
         except StopIteration:
-            self.generator_sequence = random.sample(self.generator_sequence, len(self.generator_sequence))
-            self.gen = (n for n in self.generator_sequence)
+            self.restart_specific_generator(self.state)
             yield self.next()
 
 

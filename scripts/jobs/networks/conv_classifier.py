@@ -64,11 +64,11 @@ def TrainConvClassifierModel(train_ds, test_ds, internal_model = None, num_epoch
         if internal_model is not None:
             model.predictor = internal_model
         model.compile(
-            optimizer=tf.optimizers.Adam(learning_rate=0.001),  # 0.001, tf.keras.optimizers.RMSprop(0.001)
+            optimizer=tf.optimizers.Adam(learning_rate=0.0001),  # 0.001, tf.keras.optimizers.RMSprop(0.001)
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
             metrics=['mae', 'accuracy']
         )
-
+        # model.summary()
     history = model.fit(
         train_ds,
         validation_data=test_ds,
