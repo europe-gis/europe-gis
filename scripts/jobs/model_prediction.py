@@ -63,6 +63,28 @@ def PredictClassifierRaster(raster_data, model, stride = 28, bad_value = -1000, 
     return data
 
 
+def PredictLogisticRegressionRaster(raster_data, model, stride = 28, bad_value = -1000, channel_n = 1, total_step = 100):
+    data = np.zeros((raster_data.shape[0], raster_data.shape[1]))
+
+    for i in range(0, raster_data.shape[0] - stride, total_step):
+        for j in range(0, raster_data.shape[1] - stride):
+            if i + total_step > raster_data.shape[0] - stride:
+                step = raster_data.shape[0] - stride - i
+            else:
+                step = total_step
+
+            windows = np.stack([raster_data[i + s:i + s + stride, j:j + stride].flatten() for s in range(step)], axis=0)
+            pred = model.predict_proba(windows)
+            data[i + int(round(stride / 2, 0)):i + int(round(stride / 2, 0)) + step, j + int(round(stride / 2, 0))] = np.squeeze(pred[:, 1])
+    return data
+
+
+def FilterPredictionRaster(base, prediction):
+    filtered_prediction = np.zeros(base.shape)
+    filtered_prediction[base == 1] = prediction[base == 1]
+    return filtered_prediction
+
+
 def WriteResultRaster(data, src_fn, out_rst_fn, channels = 10):
     if len(data.shape) < 3:
         data = np.expand_dims(data, axis=2)

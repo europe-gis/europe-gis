@@ -11,16 +11,6 @@ class ConvClassifier(tf.keras.Model):
 
         self.predictor = tf.keras.Sequential(
             [
-                tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same', strides=2),
-                tf.keras.layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=2),
-                tf.keras.layers.Flatten(),
-                tf.keras.layers.Dense(internal_dense_size, activation='relu'),
-                tf.keras.layers.Dense(1, use_bias=True, activation='sigmoid')
-            ]
-        )
-
-        self.predictor = tf.keras.Sequential(
-            [
                 tf.keras.layers.Flatten(),
                 tf.keras.layers.Dense(internal_dense_size, activation='relu'),
                 tf.keras.layers.Dense(1, use_bias=True, activation='sigmoid')
@@ -64,10 +54,13 @@ def TrainConvClassifierModel(train_ds, test_ds, internal_model = None, num_epoch
         if internal_model is not None:
             model.predictor = internal_model
         model.compile(
-            optimizer=tf.optimizers.Adam(learning_rate=0.0001),  # 0.001, tf.keras.optimizers.RMSprop(0.001)
+            optimizer=tf.keras.optimizers.SGD(learning_rate=0.01, momentum=1, nesterov=True),
             loss=tf.keras.losses.BinaryCrossentropy(from_logits=False),
             metrics=['mae', 'accuracy']
         )
+# optimizer=tf.optimizers.Adam(learning_rate=0.0001),
+# 0.001, tf.keras.optimizers.RMSprop(0.001)
+
         # model.summary()
     history = model.fit(
         train_ds,

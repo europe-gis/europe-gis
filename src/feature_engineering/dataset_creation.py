@@ -12,10 +12,6 @@ from tqdm import tqdm
 hdf5_dir = '/mnt/share/mnt/RESEARCH/SATELLITE/WORK/'
 
 
-def ReadRasterFile(input_fn):
-    with rasterio.open(input_fn) as src:
-        return src.read(1)
-
 
 def CreateStridedArray(raster, window_size = 28, limit = 10000000, bad_value = -1):
     step = 0
@@ -104,86 +100,10 @@ class StridedArrayGenerator:
         yield CreateCompositeStridedArray(self.rasters, self.gen, window_size = self.window_size, limit = self.file_row_n)
 
 
-def create_generator_sequence(rasters, window_size = 28, padding_size = 0):
-
-    for key in rasters:
-        if rasters[key]['type'] == 'input':
-            raster_shape = rasters[key]['data'].shape
-    generator_sequence = random.sample(list(itertools.product(range(0 + padding_size, raster_shape[0] - window_size + 1 - padding_size), range(0 + padding_size, raster_shape[1] - window_size + 1 - padding_size))), (raster_shape[0] - window_size + 1 - 2 * padding_size) * (raster_shape[1] - window_size + 1 - 2 * padding_size))
-    return generator_sequence
 
 
-class SequenceSeparator():
-    def __init__(self, rasters, window_size = 28):
-        self.window_size = window_size
-        input_rasters = []
-        for key in rasters:
-            if rasters[key]['type'] == 'input':
-                raster_shape = rasters[key]['data'].shape
-                input_rasters.append(rasters[key]['data'])
-            else:
-                self.output_raster = rasters[key]['data']
-        self.input_data = np.stack(input_rasters, axis = -1)
-
-    def separate_sequence(self, sequence):
-        seq = [[], []]
-        for (i, j) in sequence:
-            if (np.amin(self.input_data[i:i + self.window_size, j:j + self.window_size]) > -1000) & (np.amin(self.output_raster[i:i + self.window_size, j:j + self.window_size]) > -1):
-                # if len(seq) <= self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))]:
-                #     seq.append([])
-                seq[int(self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))])].append((i, j))
-        self.generator_sequences = seq
-
-    def __call__(self, generator_sequence = None):
-        self.separate_sequence(generator_sequence)
-        return self.generator_sequences
 
 
-class InMemoryStridedArrayGenerator:
-    def __init__(self, rasters, window_size = 28, generator_sequences = None):
-        self.window_size = window_size
-        self.generator_sequences = generator_sequences
-        input_rasters = []
-        for key in rasters:
-            if rasters[key]['type'] == 'input':
-                raster_shape = rasters[key]['data'].shape
-                input_rasters.append(rasters[key]['data'])
-            else:
-                self.output_raster = rasters[key]['data']
-        self.input_data = np.stack(input_rasters, axis = -1)
-        self.restart_all_generators()
-        self.state = 0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        return self.next()
-
-    def restart_all_generators(self):
-        self.generators = [] * len(self.generator_sequences)
-        self.generators = [(n for n in random.sample(sequence, len(sequence))) for sequence in self.generator_sequences]
-
-    def restart_specific_generator(self, index):
-        self.generator_sequences[index] = random.sample(self.generator_sequences[index], len(self.generator_sequences[index]))
-        self.generators[index] = (n for n in self.generator_sequences[index])
-
-    def next(self):
-        # self.state = 1 - self.state
-        if random.random() > 2 / 4:
-            self.state = 1
-        else:
-            self.state = 0
-        i, j = next(self.generators[self.state])
-        # return self.input_data[i:i + self.window_size, j:j + self.window_size], [self.output_raster[i + int(round(self.window_size / 2, 0)), j + int(round(self.window_size / 2, 0))]]
-        return self.input_data[i:i + self.window_size, j:j + self.window_size], [int(np.amax(self.output_raster[i + int(round(self.window_size / 2, 0)) - 1:i + int(round(self.window_size / 2, 0)) + 1, j + int(round(self.window_size / 2, 0)) - 1:j + int(round(self.window_size / 2, 0)) + 1]))]
-
-    def __call__(self):
-        try:
-            yield self.next()
-        except StopIteration:
-            self.restart_specific_generator(self.state)
-            yield self.next()
 
 
 class InMemoryStridedArrayGeneratorForLogisticRegression:
@@ -227,43 +147,6 @@ class InMemoryStridedArrayGeneratorForLogisticRegression:
             yield self.next()
 
 
-def PreProcessLogarithmPopulationRaster(a, max = 10):
-    a[a < 2] = 1
-    a = np.log(a)
-    a[a > max] = max
-    a = a / max
-    return a
-
-
-def PreprocessDEMRaster(a):
-    a[a < -1000] = 0
-    return a
-
-
-def PreProcessBorderRaster(a, bad_value = -1000):
-    a[a < bad_value] = bad_value
-    a[a > 2] = 1
-    a[a == 2] = 0
-    return a
-
-
-def PreProcessWWRaster(a, bad_value = 255):
-    a[a == bad_value] = -1000
-    a[a < 0] = 0
-    return a
-
-
-def PreprocessForResnet(a, bad_value = -1000):
-    min_value = np.amin(a[a > bad_value])
-    max_value = np.amax(a[a > bad_value])
-    a[a > bad_value] = 255.999 * (a[a > bad_value] - min_value) / (max_value - min_value)
-    a = a.astype(np.uint8)
-    return a
-
-
-def PreProcessPopulationRaster(a):
-    a[a < 0] = 0
-    return a
 
 
 def CreateTFDataset(input_array):
@@ -332,17 +215,6 @@ def CreateTFDatasetFromGenerator(fn):
     full_dataset = full_dataset.repeat()
     return full_dataset
 
-
-def CreateTFDatasetFromInMemoryGenerator(gen, batch_size = 64, window_size = 28, channel_n = 1):
-
-    output_shapes = ((window_size, window_size, channel_n), (1))
-    output_types = (tf.float32, tf.int8)
-
-    full_dataset = tf.data.Dataset.from_generator(gen, output_types=output_types, output_shapes=output_shapes)
-    full_dataset = full_dataset.batch(batch_size)
-    # full_dataset = full_dataset.shuffle(1000)
-    full_dataset = full_dataset.repeat()
-    return full_dataset
 
 
 def get_hdf5_dataset_size(file):

@@ -16,7 +16,10 @@
         "BA"
     ],
     "FILES" : {
-        "NUTS" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_3.shp",
+        "NUTS3" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_3.shp",
+        "NUTS2" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_2.shp",
+        "NUTS1" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_1.shp",
+        "NUTS0" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_0.shp",
         "POP" : "GEOSTATReferenceGrid/Grid_ETRS89_LAEA_1K-ref_GEOSTAT_POP_2011_V2_0_1.shp",
         "POP_CSV" : [
             "GEOSTAT_grid_POP_1K_2011_V2_0_1.csv",

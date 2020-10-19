@@ -1,7 +1,6 @@
 import os
 import json
 import shutil
-import pathlib
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -9,13 +8,11 @@ import rasterio
 import rasterio.plot
 import rasterio.env
 from rasterio import features
-from rasterio.windows import Window, from_bounds
 from rasterio.enums import MergeAlg
-from matplotlib import pyplot
 from osgeo import gdal
 
 
-class FilePath(object):
+class FilePath:
     def __init__(self, config):
         self.root_dem_path = config['ROOT_LOCATIONS']['DEM']
         self.root_nuts_path = config['ROOT_LOCATIONS']['NUTS']
@@ -29,108 +26,21 @@ class FilePath(object):
                     self.dem_source_fns.append(os.path.join(r, file))
 
 
-class ProcessRasterLayer(object):
-    @staticmethod
-    def ReadWindowFromCoordinates(cls, src_fn, coordinates):
-        left, bottom, right, top = coordinates
-        with rasterio.open(src_fn) as src:
-            window = from_bounds(
-                left,
-                bottom,
-                right,
-                top,
-                transform=src.transform
-            )
-            w = src.read(
-                1,
-                window=window
-            )
-        return w
-
-    @staticmethod
-    def plotArray(cls, array, cmap='viridis'):
-        pyplot.imshow(array, cmap=cmap)
-        pyplot.show()
-        return
-
-    @staticmethod
-    def PrintRasterFileStatistics(cls, input_fn):
-        with rasterio.open(input_fn) as src:
-            # rasterio.plot.show(src)
-            print(src.crs)
-            print(src.count)
-            print(src.width)
-            print(src.height)
-            print(src.bounds)
-        return
-
-    @staticmethod
-    def GetRasterBoundingBox(cls, input_fn):
-
-        with rasterio.open(input_fn) as src:
-            bounds = src.bounds
-        # (lower_left_x, lower_left_y, upper_right_x, upper_right_y) = bounds
-        return bounds
-
-    @staticmethod
-    def RoundBoundingBox(cls, fr, bb, resolution, pad = 0):
-
-        def RoundBound(outer, inner):
-            if outer > inner:
-                return inner + (outer - inner) % resolution + pad
-            else:
-                return inner - (inner - outer) % resolution - pad
-
-        result_list = []
-        for i in range(len(fr)):
-            result_list.append(RoundBound(fr[i], bb[i]))
-        return tuple(result_list)
-
-    @staticmethod
-    def ReadWindowFromOffset(cls, src_fn, coordinates):
-        column_offset, row_offset, width, height = coordinates
-        with rasterio.open(src_fn) as src:
-            w = src.read(
-                1,
-                window=Window(column_offset, row_offset, width, height)
-            )
-        return w
-
-    @staticmethod
-    def PolygonizeRasterLayer(cls, src_fn):
-        mask = None
-        with rasterio.Env():
-            with rasterio.open(src_fn) as src:
-                meta = src.meta.copy()
-                meta.update(compress='lzw')
-                image = src.read(1)
-                results = (
-                    {'properties': {'raster_val': v}, 'geometry': s}
-                    for i, (s, v)
-                    in enumerate(
-                        features.shapes(image, mask=mask, transform=src.transform)
-                    )
-                )
-
-        geoms = list(results)
-        gpd_polygonized_raster = gpd.GeoDataFrame.from_features(geoms, meta["crs"])
-        return gpd_polygonized_raster
-
+class RasterLayerProcessor:
     def __init__(self, restart = False):
 
-        with open(str(pathlib.Path().absolute()).replace('/notebooks', '') + '/config/config.json') as json_file:
+        with open('config.json') as json_file:
             self.config = json.load(json_file)
 
         self.filepath = FilePath(self.config)
 
         if restart:
             shutil.rmtree(self.filepath.root_work_path, ignore_errors=True)
-            # if not os.path.exists(root_work_path):
             os.makedirs(self.filepath.root_work_path)
 
         self.raster_metadata = {}
 
-    def LoadBorderShapefile(self, level = 3):
+    def load_nuts_border_shapefile(self, level = 3):
 
         shp_fn = self.filepath.root_nuts_path + self.config['FILES'][f'NUTS{level}']
         if not hasattr(self, 'nuts_borders'):
@@ -138,7 +48,7 @@ class ProcessRasterLayer(object):
         self.nuts_borders[level] = gpd.read_file(shp_fn).to_crs(self.config['CRS'])
         return
 
-    def LoadCountryBorderShapefile(self):
+    def load_country_border_shapefile(self):
 
         shp_fn = self.config['ROOT_LOCATIONS']['CB'] + self.config['FILES']['CB']
         self.country_borders = gpd.read_file(shp_fn).to_crs(self.config['CRS'])
@@ -146,9 +56,8 @@ class ProcessRasterLayer(object):
 
         return
 
-    def GetTargetBoundingBox(self):
-        if not hasattr(self, 'nuts_borders'):
-            self.LoadBorderShapefile()
+    def get_target_bounding_box(self):
+        self.load_nuts_border_shapefile()
         self.bounding_box = tuple(self.nuts_borders[3][self.nuts_borders[3]['CNTR_CODE'] == 'HU'].total_bounds)
         pad = [-1, -1, 1, 1]
         pad = list(map(lambda x: x * self.config['AGGREGATION']['DEM'] * (self.config['AGGREGATION']['TARGET_SQ_RESOLUTION'] * 2), pad))
@@ -163,7 +72,7 @@ class ProcessRasterLayer(object):
 
         return
 
-    def LoadRasterStatistics(self, input_fn, name):
+    def load_raster_statistics(self, input_fn, name):
         if not hasattr(self, 'loaded_files'):
             self.loaded_files = {}
 
@@ -179,7 +88,7 @@ class ProcessRasterLayer(object):
 
         return
 
-    def CreateVRT(self, fn, bounds=None, xy_resolution = 100, src_fns = None):
+    def create_vrt(self, fn, bounds=None, xy_resolution = 100, src_fns = None):
         if not src_fns:
             src_fns = self.filepath.dem_source_fns
         vrt_fn = self.filepath.root_work_path + fn + '.vrt'
@@ -199,33 +108,34 @@ class ProcessRasterLayer(object):
         setattr(self.filepath, fn + '_vrt_fn', vrt_fn)
         return
 
-    def CreateFullVRT(self):
-        self.CreateVRT(
+    def create_dem_full_vrt(self):
+        self.create_vrt(
             'dem_full',
             xy_resolution=self.config['AGGREGATION']['DEM']
         )
-        self.LoadRasterStatistics(self.filepath.dem_full_vrt_fn, 'dem_full')
+        self.load_raster_statistics(self.filepath.dem_full_vrt_fn, 'dem_full')
         return
 
-    def CreateAggregatedVRT(self, bounds=None):
-        self.CreateVRT(
+    def create_dem_aggr_vrt(self, bounds=None):
+        self.create_vrt(
             'dem_aggr',
             bounds = bounds,
             xy_resolution=self.config['AGGREGATION']['DEM']
         )
-        self.LoadRasterStatistics(self.filepath.dem_aggr_vrt_fn, 'dem_aggr')
+        self.load_raster_statistics(self.filepath.dem_aggr_vrt_fn, 'dem_aggr')
         return
 
-    def CreateAggregatedWWVRT(self, bounds=None):
-        self.CreateVRT(
+    def create_ww_aggr_vrt(self, bounds=None):
+        self.create_vrt(
             'ww_aggr',
             bounds = bounds,
             xy_resolution=self.config['AGGREGATION']['DEM'],
-            src_fns=self.config['ROOT_LOCATIONS']['WW'] + self.config['FILES']['WW'])
-        self.LoadRasterStatistics(self.filepath.ww_aggr_vrt_fn, 'ww_aggr')
+            src_fns=self.config['ROOT_LOCATIONS']['WW'] + self.config['FILES']['WW']
+        )
+        self.load_raster_statistics(self.filepath.ww_aggr_vrt_fn, 'ww_aggr')
         return
 
-    def CreateTIFFromVRT(self, fn = 'dem_aggr_rst'):
+    def build_tiff_from_vrt(self, fn = 'dem_aggr_rst'):
         if hasattr(self.filepath, 'dem_aggr_vrt_fn'):
             dem_rst_fn = self.filepath.root_work_path + fn + '.tif'
             gdal.Translate(dem_rst_fn, self.filepath.dem_aggr_vrt_fn)
@@ -234,25 +144,20 @@ class ProcessRasterLayer(object):
             raise UserWarning
         return
 
-    def BuildTIFFromVRT(self, in_vrt_fn, out_rst_fn):
-        gdal.Translate(out_rst_fn, in_vrt_fn)
-        return
-
-    def LoadRasterMetadata(self, rst_fn):
+    def load_raster_metadata(self, rst_fn):
         rst = rasterio.open(rst_fn)
         meta = rst.meta.copy()
         meta.update(compress='lzw')
         self.raster_metadata[rst_fn] = meta
         return
 
-    def CreateBorderRaster(self):
-        # if not hasattr(self, 'nuts_borders'):
+    def build_nuts_border_raster(self):
         for level in range(0, 4):
-            self.LoadBorderShapefile(level = level)
+            self.load_nuts_border_shapefile(level = level)
 
             in_rst_fn = self.filepath.root_work_path + 'dem_aggr_rst.tif'
             if in_rst_fn not in self.raster_metadata:
-                self.LoadRasterMetadata(in_rst_fn)
+                self.load_raster_metadata(in_rst_fn)
             out_rst_fn = self.filepath.root_work_path + f'nuts_rst{level}.tif'
             with rasterio.open(out_rst_fn, 'w+', **self.raster_metadata[in_rst_fn]) as out_rst:
 
@@ -280,17 +185,15 @@ class ProcessRasterLayer(object):
                     merge_alg = MergeAlg.add
                 )
                 out_rst.write_band(1, burned)
-
         return
 
-    def CreateAreaRaster(self):
-        # if not hasattr(self, 'nuts_borders'):
+    def build_area_raster(self):
         for level in range(0, 4):
-            self.LoadBorderShapefile(level = level)
+            self.load_nuts_border_shapefile(level = level)
 
             in_rst_fn = self.filepath.root_work_path + 'dem_aggr_rst.tif'
             if in_rst_fn not in self.raster_metadata:
-                self.LoadRasterMetadata(in_rst_fn)
+                self.load_raster_metadata(in_rst_fn)
             out_rst_fn = self.filepath.root_work_path + f'nuts_area_rst{level}.tif'
             with rasterio.open(out_rst_fn, 'w+', **self.raster_metadata[in_rst_fn]) as out_rst:
 
@@ -321,19 +224,18 @@ class ProcessRasterLayer(object):
 
         return
 
-    def CreateBoundedDEMRaster(self):
+    def build_bounded_dem_raster(self):
 
-        self.CreateFullVRT()
-        self.GetTargetBoundingBox()
+        self.create_dem_full_vrt()
+        self.get_target_bounding_box()
 
-        self.CreateAggregatedVRT(
+        self.create_dem_aggr_vrt(
             bounds=self.padded_bounding_box
         )
-        self.CreateTIFFromVRT(fn = 'dem_aggr_rst')
-        self.CreateBorderRaster()
+        self.build_tiff_from_vrt(fn = 'dem_aggr_rst')
         return
 
-    def PreparePopulationShapefile(self):
+    def prepare_population_shapefile(self):
 
         data = pd.concat(
             [
@@ -357,20 +259,19 @@ class ProcessRasterLayer(object):
         data = None
         pop_shp = pop_shp.to_crs(self.config["CRS"])
 
-        if not hasattr(self, 'padded_bounding_box'):
-            self.GetTargetBoundingBox()
+        self.get_target_bounding_box()
         xmin, ymin, xmax, ymax = self.padded_bounding_box
         pop_shp = pop_shp.cx[xmin:xmax, ymin:ymax]
 
         pop_shp.to_file(self.filepath.root_work_path + 'pop_shp.shp')
         return
 
-    def RasterizePopulationShapefile(self):
+    def rasterize_population_shapefile(self):
         pop_shp = gpd.read_file(self.filepath.root_work_path + 'pop_shp.shp')
 
         in_rst_fn = self.filepath.root_work_path + 'dem_aggr_rst.tif'
         if in_rst_fn not in self.raster_metadata:
-            self.LoadRasterMetadata(in_rst_fn)
+            self.load_raster_metadata(in_rst_fn)
         out_rst_fn = self.filepath.root_work_path + 'pop_rst.tif'
         with rasterio.open(out_rst_fn, 'w+', **self.raster_metadata[in_rst_fn]) as out_rst:
 
@@ -389,57 +290,12 @@ class ProcessRasterLayer(object):
 
         return
 
-    def AllocatePopulationToRaster(self):
-        self.filepath.dem_aggr_vrt_fn = self.filepath.root_work_path + 'dem_aggr_rst' + '.tif'
-        self.LoadRasterMetadata(self.filepath.dem_aggr_vrt_fn)
-        pop_shp = gpd.read_file(self.filepath.root_work_path + 'pop_shp.shp')
-        rst_shp = gpd.read_file(self.filepath.root_work_path + 'rst_shp.shp')
-
-        # res_intersection = gpd.overlay(rst_shp, pop_shp, how='intersection')
-        # res_intersection.to_file(self.filepath.root_work_path + 'intersection_shp.shp')
-        res_intersection = gpd.read_file(self.filepath.root_work_path + 'intersection_shp.shp')
-
-        original_size = pop_shp.area[0]
-        res_intersection['TOT_P'] = res_intersection['TOT_P'] * (res_intersection.area / original_size)
-
-        out_fn = self.filepath.root_work_path + 'pop_rst.tif'
-        with rasterio.open(out_fn, 'w+', **self.raster_metadata) as out_rst:
-
-            out_rst_data = out_rst.read(1)
-            shapes = ((geom, value) for geom, value in zip(res_intersection.geometry, res_intersection.shape[0] * [0]) if features.is_valid_geom(geom))
-
-            burned = features.rasterize(
-                shapes=shapes,
-                fill=0,
-                out=out_rst_data,
-                transform=out_rst.transform,
-                all_touched = True,
-                merge_alg = MergeAlg.replace
-            )
-            out_rst.write_band(1, burned)
-
-            out_rst_data = out_rst.read(1)
-            shapes = ((geom, value) for geom, value in zip(res_intersection.geometry, res_intersection.TOT_P) if features.is_valid_geom(geom))
-
-            burned = features.rasterize(
-                shapes=shapes,
-                fill=0,
-                out=out_rst_data,
-                transform=out_rst.transform,
-                all_touched = True,
-                merge_alg = MergeAlg.add
-            )
-            out_rst.write_band(1, burned)
-
-        return
-
-    def CreateNonEUCountryRaster(self):
-        if not hasattr(self, 'nuts_borders'):
-            self.LoadCountryBorderShapefile()
+    def build_non_country_border_raster(self):
+        self.load_country_border_shapefile()
 
         in_rst_fn = self.filepath.root_work_path + 'dem_aggr_rst.tif'
         if in_rst_fn not in self.raster_metadata:
-            self.LoadRasterMetadata(in_rst_fn)
+            self.load_raster_metadata(in_rst_fn)
         out_rst_fn = self.filepath.root_work_path + 'cb_rst.tif'
         with rasterio.open(out_rst_fn, 'w+', **self.raster_metadata[in_rst_fn]) as out_rst:
 
@@ -458,24 +314,28 @@ class ProcessRasterLayer(object):
 
         return
 
-    def CreateBoundedWWRaster(self):
+    def build_bounded_ww_raster(self):
 
-        self.GetTargetBoundingBox()
-
-        self.CreateAggregatedWWVRT(
+        self.get_target_bounding_box()
+        self.create_ww_aggr_vrt(
             bounds=self.padded_bounding_box
         )
-        self.BuildTIFFromVRT(
-            in_vrt_fn = self.config['ROOT_LOCATIONS']['WORK'] + 'ww_aggr.vrt',
-            out_rst_fn = self.config['ROOT_LOCATIONS']['WORK'] + 'ww_aggr_rst.tif'
+        gdal.Translate(
+            self.config['ROOT_LOCATIONS']['WORK'] + 'ww_aggr_rst.tif',
+            self.config['ROOT_LOCATIONS']['WORK'] + 'ww_aggr.vrt'
         )
         return
 
-    def ProcessAllLayer(self):
-        self.CreateBoundedDEMRaster()
-        self.PreparePopulationShapefile()
-        self.RasterizePopulationShapefile()
-        self.CreateNonEUCountryRaster()
-        self.CreateBoundedWWRaster()
-        self.CreateAreaRaster()
+    def build_population_raster(self):
+        self.prepare_population_shapefile()
+        self.rasterize_population_shapefile()
+        return
+
+    def process_all_layers(self):
+        self.build_bounded_dem_raster()
+        self.build_nuts_border_raster()
+        self.build_population_raster()
+        self.build_non_country_border_raster()
+        self.build_bounded_ww_raster()
+        self.build_area_raster()
         return

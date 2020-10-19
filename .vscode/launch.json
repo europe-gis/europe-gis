@@ -6,6 +6,13 @@
       "request": "launch",
       "name": "test eugis python",
       "program": "${workspaceFolder}/main.py"
+    },
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "Test EUGIS data engineering",
+      "program": "${workspaceFolder}/src/data_engineering/main.py",
+      "cwd": "${workspaceFolder}/src/data_engineering"
     }
   ]
 }
