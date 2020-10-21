@@ -15,6 +15,9 @@
         "ME", "MK", "AL", "RS", "TR",
         "BA"
     ],
+    "TARGET_COUNTRY_CODE_LIST": [
+        "HU"
+    ],
     "FILES" : {
         "NUTS3" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_3.shp",
         "NUTS2" : "ref-nuts-2016-01m.shp/NUTS_RG_01M_2016_3035_LEVL_2.shp",

@@ -52,13 +52,13 @@ class RasterLayerProcessor:
 
         shp_fn = self.config['ROOT_LOCATIONS']['CB'] + self.config['FILES']['CB']
         self.country_borders = gpd.read_file(shp_fn).to_crs(self.config['CRS'])
-        self.country_borders = self.country_borders[~self.country_borders['ISO2'].isin(self.config['COUNTRY_CODE_LIST'])]
+        self.country_borders = self.country_borders[self.country_borders['ISO2'].isin(self.config['COUNTRY_CODE_LIST'])]  # ...ers[~self...
 
         return
 
     def get_target_bounding_box(self):
         self.load_nuts_border_shapefile()
-        self.bounding_box = tuple(self.nuts_borders[3][self.nuts_borders[3]['CNTR_CODE'] == 'HU'].total_bounds)
+        self.bounding_box = tuple(self.nuts_borders[3][self.nuts_borders[3]['CNTR_CODE'].isin(self.config['TARGET_COUNTRY_CODE_LIST'])].total_bounds)
         pad = [-1, -1, 1, 1]
         pad = list(map(lambda x: x * self.config['AGGREGATION']['DEM'] * (self.config['AGGREGATION']['TARGET_SQ_RESOLUTION'] * 2), pad))
         self.padded_bounding_box = tuple([self.bounding_box[i] + pad[i] for i in range(len(self.bounding_box))])
