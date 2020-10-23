@@ -22,7 +22,7 @@ def create_separated_sequences(rasters, window_size = 28, padding_size = 0):
         (raster_shape[0] - window_size + 1 - 2 * padding_size) * (raster_shape[1] - window_size + 1 - 2 * padding_size)
     )
 
-    sequences = [] * len(np.unique(output_raster))
+    sequences = [[] for _ in range(len(np.unique(output_raster)))]
     output_value_dict = {}
     for x in range(0, len(np.unique(output_raster))):
         output_value_dict[np.unique(output_raster)[x]] = x

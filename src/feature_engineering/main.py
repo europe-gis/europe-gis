@@ -1,6 +1,8 @@
-from . import raster_preprocessor
-from . import sequence_separator
-from . import feature_generator
+import raster_preprocessor
+import sequence_separator
+
+import pickle
+
 
 if __name__ == "__main__":
 
@@ -19,26 +21,19 @@ if __name__ == "__main__":
         },
         'nuts': {
             'type': 'output',
-            'fn': '/mnt/share/mnt/RESEARCH/SATELLITE/WORK/nuts_rst.tif'
+            'fn': '/mnt/share/mnt/RESEARCH/SATELLITE/WORK/nuts_rst3.tif'
+        },
+        'area': {
+            'type': 'aux',
+            'fn': '/mnt/share/mnt/RESEARCH/SATELLITE/WORK/nuts_area_rst3.tif'
         }
     }
-    window_size = 101
+    window_size = 50
     padding_size = 50
 
-    data_preprocessor = raster_preprocessor.DataPreprocessor(raster_config_dict = rasters)
+    data_preprocessor = raster_preprocessor.DataPreprocessor(raster_config_dict = rasters, window_size = window_size)
     rasters = data_preprocessor.create_preprocessed_data()
 
     generator_sequences = sequence_separator.create_separated_sequences(rasters, window_size, padding_size)
 
-    train_gen = feature_generator.InMemoryStridedArrayGenerator(
-        rasters,
-        window_size = window_size,
-        generator_sequences = [generator_sequence[0:int(len(generator_sequence) * 0.8)] for generator_sequence in generator_sequences]
-    )
-    train_dataset = feature_generator.create_tfds_from_imgenerator(train_gen, batch_size = 64, window_size = window_size, channel_n = len(rasters) - 1)
-    test_gen = feature_generator.InMemoryStridedArrayGenerator(
-        rasters,
-        window_size = window_size,
-        generator_sequences = [generator_sequence[int(len(generator_sequence) * 0.8):] for generator_sequence in generator_sequences]
-    )
-    test_dataset = feature_generator.create_tfds_from_imgenerator(test_gen, batch_size = 64, window_size = window_size, channel_n = len(rasters) - 1)
+    pickle.dump([rasters, generator_sequences, window_size], open("../../tmp/features.p", "wb"))

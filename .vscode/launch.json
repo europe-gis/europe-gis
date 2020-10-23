@@ -10,9 +10,23 @@
     {
       "type": "python",
       "request": "launch",
-      "name": "Test EUGIS data engineering",
+      "name": "RUN EUGIS data engineering",
       "program": "${workspaceFolder}/src/data_engineering/main.py",
       "cwd": "${workspaceFolder}/src/data_engineering"
+    },
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "RUN EUGIS feature engineering",
+      "program": "${workspaceFolder}/src/feature_engineering/main.py",
+      "cwd": "${workspaceFolder}/src/feature_engineering"
+    },
+    {
+      "type": "python",
+      "request": "launch",
+      "name": "RUN EUGIS model_training",
+      "program": "${workspaceFolder}/src/model_training/main.py",
+      "cwd": "${workspaceFolder}/src/model_training"
     }
   ]
 }

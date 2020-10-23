@@ -18,6 +18,7 @@ class InMemoryStridedArrayGenerator:
         self.input_data = np.stack(input_rasters, axis = -1)
         self.restart_all_generators()
         self.state = 0
+        self.acceptable_ids = [x for x in range(0, len(self.generator_sequences)) if len(self.generator_sequences[x]) > 0]
 
     def __iter__(self):
         return self
@@ -26,7 +27,7 @@ class InMemoryStridedArrayGenerator:
         return self.next()
 
     def restart_all_generators(self):
-        self.generators = [] * len(self.generator_sequences)
+        self.generators = [[] for _ in range(len(self.generator_sequences))]
         self.generators = [(n for n in random.sample(sequence, len(sequence))) for sequence in self.generator_sequences]
 
     def restart_specific_generator(self, index):
@@ -34,9 +35,10 @@ class InMemoryStridedArrayGenerator:
         self.generators[index] = (n for n in self.generator_sequences[index])
 
     def next(self):
-        self.state = random.randrange(0, len(self.generator_sequences))
+        # self.state = random.randrange(0, len(self.generator_sequences))
+        self.state = random.choice(self.acceptable_ids)
         i, j = next(self.generators[self.state])
-        return self.input_data[i:i + self.window_size, j:j + self.window_size], [int(np.amax(self.output_raster[i + int(round(self.window_size / 2, 0)) - 1:i + int(round(self.window_size / 2, 0)) + 1, j + int(round(self.window_size / 2, 0)) - 1:j + int(round(self.window_size / 2, 0)) + 1]))]
+        return self.input_data[i:i + self.window_size, j:j + self.window_size], [self.state]  # [int(np.amax(self.output_raster[i + int(round(self.window_size / 2, 0)) - 1:i + int(round(self.window_size / 2, 0)) + 1, j + int(round(self.window_size / 2, 0)) - 1:j + int(round(self.window_size / 2, 0)) + 1]))]
 
     def __call__(self):
         try:
@@ -49,7 +51,7 @@ class InMemoryStridedArrayGenerator:
 def create_tfds_from_imgenerator(gen, batch_size = 64, window_size = 28, channel_n = 1):
 
     output_shapes = ((window_size, window_size, channel_n), (1))
-    output_types = (tf.float32, tf.int8)
+    output_types = (tf.float32, tf.int16)
 
     full_dataset = tf.data.Dataset.from_generator(gen, output_types=output_types, output_shapes=output_shapes)
     full_dataset = full_dataset.batch(batch_size)
